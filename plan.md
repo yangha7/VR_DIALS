@@ -118,5 +118,31 @@ Things structurally hard on a 2D desktop viewer but natural in a headset:
 
 ## Status
 
-Plan written 2026-09-04. Next step: Phase 0 — fork `dials_browser_rlv` and verify
-the existing desktop viewer runs locally.
+- 2026-09-04: Plan written. `dials_browser_rlv` (MIT) imported as the local git
+  history's base commit; `npm install` and `npm run dev`/`npm run build` verified
+  working. Fixed two pre-existing HTML bugs (stray commas in attribute lists) that
+  broke under the current Vite/parse5 toolchain, blocking both dev and build.
+  `ReciprocalLatticeViewerHeadless.html` is the entry point actually built/deployed
+  per `vite.config.js` (`main`); `ReciprocalLatticeViewer.html` and
+  `ReciprocalLatticeViewerHeadlessHttp.html` are alternate entry points not wired
+  into the build yet — worth clarifying their intended roles before Phase 1 work
+  picks one to extend with WebXR.
+- Repo is a fresh local git repo (not yet pushed anywhere), remote `upstream` set
+  to `https://github.com/toastisme/dials_browser_rlv.git` for reference/pulling
+  future upstream fixes. Local git identity was set repo-scoped (not global) as
+  `yangha@lbl.gov` / "Yang Ha" since none existed on this machine — change with
+  `git config user.name`/`user.email` (no `--global`) if that's not right.
+
+Next step: Phase 1 — pick the entry point to extend (likely
+`ReciprocalLatticeViewerHeadless.html`, the one with a real build target) and add
+a WebXR session to it, porting controller/laser-pointer code from `vr_viewer.html`.
+
+## Access needed from user (open)
+
+- **GitHub**: no access needed to reach this point. Will need a repo to push to
+  (yours, or a fork under your account) once ready to publish/deploy — not urgent yet.
+- **`dials.lbl.gov` SSH**: not needed for Phase 0/1 with synthetic or small sample
+  `.expt`/`.refl` files. Will matter once Phase 1 needs a first real dataset to
+  drag-and-drop test against, and is required for Phase 2 (real fine-sliced data)
+  and Phase 3 (live DIALS session). Send over a small sample pair, or access
+  whenever convenient — not blocking right now.
