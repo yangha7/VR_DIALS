@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 import { gsap } from "gsap";
 import { MeshLineGeometry,  MeshLineMaterial, raycast } from 'meshline';
 
@@ -3176,6 +3178,13 @@ export class ReciprocalLatticeViewer {
     if (!this.renderRequested) {
       return;
     }
+    if (window.renderer.xr.isPresenting) {
+      // The VR render loop (vrAnimate, driven by renderer.setAnimationLoop)
+      // owns rendering while a WebXR session is active; the orthographic
+      // desktop camera isn't part of that scene graph position while presenting.
+      this.renderRequested = false;
+      return;
+    }
     window.viewer.updateGUIInfo();
     window.controls.update();
     window.renderer.render(window.scene, window.camera);
@@ -3294,4 +3303,310 @@ export function setupScene() {
   });
   window.viewer.setCameraToDefaultPosition();
   window.viewer.requestRender();
+
+  setupVR();
+}
+
+// ---------------------------------------------------------------------------
+// WebXR (VR) support
+//
+// The desktop view is driven by an OrthographicCamera + OrbitControls, neither
+// of which WebXR can use: an immersive session supplies its own per-eye
+// perspective projection from the headset every frame, and moving that camera
+// by hand (as OrbitControls does) would fight the headset's own tracking.
+// So VR uses a second, separate PerspectiveCamera mounted on a rig that is
+// left stationary at the origin; instead of moving the camera, the user grabs
+// and turns the *content* directly (grab-rotate via the trigger, or a
+// thumbstick as a hands-free alternative). This avoids camera-motion
+// discomfort and matches how you'd handle a physical crystal model.
+//
+// Content is also re-scaled for VR (see VR_WORLD_SCALE below): the desktop
+// scene's coordinates span on the order of a thousand units (the default
+// camera sits 1000 units from the origin). Rendered 1:1 as metres, that
+// distance would be vast next to the ~6cm eye separation used for stereo
+// rendering, collapsing depth perception to nearly nothing. Scaling the
+// *content* down (rather than the camera) keeps a normal FOV/near/far range
+// and puts the lattice at a distance where stereo depth is actually visible.
+// Reflections are still added to window.scene from many call sites across
+// this file; rather than rewire all of them, scene.add is redirected to the
+// scaled content group for the duration of the VR session (see
+// onVRSessionStart/onVRSessionEnd) and restored unchanged for desktop use.
+// ---------------------------------------------------------------------------
+
+const VR_WORLD_SCALE = 1 / 300;
+const VR_MIN_SCALE_MULT = 0.2;
+const VR_MAX_SCALE_MULT = 5;
+const VR_CONTENT_DISTANCE = 1.2; // metres in front of the rig
+
+let vrLastFrameTime = null;
+
+function setupVR() {
+  const renderer = window.renderer;
+  renderer.xr.enabled = true;
+  renderer.xr.setReferenceSpaceType('local');
+
+  if (navigator.xr && navigator.xr.isSessionSupported) {
+    navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+      if (supported) {
+        document.body.appendChild(VRButton.createButton(renderer));
+      }
+    });
+  }
+
+  const aspect = window.innerWidth / window.innerHeight;
+  const vrCamera = new THREE.PerspectiveCamera(60, aspect, 0.01, 1000);
+
+  // Left at the origin, unrotated: a fixed vantage point the user's own head
+  // tracking looks around from. Locomotion is deliberately not implemented in
+  // v1 (rotating/scaling the content instead avoids camera-motion sickness).
+  const vrRig = new THREE.Group();
+  vrRig.name = 'vrRig';
+  vrRig.add(vrCamera);
+  window.scene.add(vrRig);
+  window.vrCamera = vrCamera;
+  window.vrRig = vrRig;
+
+  const controllerModelFactory = new XRControllerModelFactory();
+  window.vrControllers = [];
+  for (let i = 0; i < 2; i++) {
+    const controller = renderer.xr.getController(i);
+    controller.userData.grabbing = false;
+    controller.userData.lastQuat = null;
+    controller.addEventListener('selectstart', () => onVRSelectStart(controller));
+    controller.addEventListener('selectend', () => onVRSelectEnd(controller));
+    vrRig.add(controller);
+
+    const grip = renderer.xr.getControllerGrip(i);
+    grip.add(controllerModelFactory.createControllerModel(grip));
+    vrRig.add(grip);
+
+    const laserGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, -1),
+    ]);
+    const laser = new THREE.Line(laserGeometry, new THREE.LineBasicMaterial({ color: 0x58a6ff }));
+    laser.name = 'laser';
+    laser.scale.z = 5;
+    controller.add(laser);
+
+    window.vrControllers.push(controller);
+  }
+
+  window.vrHoverPanel = createVRHoverPanel();
+  vrCamera.add(window.vrHoverPanel);
+
+  window.addEventListener('resize', () => {
+    vrCamera.aspect = window.innerWidth / window.innerHeight;
+    vrCamera.updateProjectionMatrix();
+  });
+
+  renderer.xr.addEventListener('sessionstart', onVRSessionStart);
+  renderer.xr.addEventListener('sessionend', onVRSessionEnd);
+}
+
+function onVRSessionStart() {
+  const scene = window.scene;
+  const vrRig = window.vrRig;
+
+  const contentGroup = new THREE.Group();
+  contentGroup.name = 'vrContentGroup';
+  contentGroup.scale.setScalar(VR_WORLD_SCALE);
+  contentGroup.position.set(0, 0, -VR_CONTENT_DISTANCE);
+
+  for (const child of [...scene.children]) {
+    if (child === vrRig) continue;
+    contentGroup.add(child); // reparent only; local transforms are untouched
+  }
+  scene.add(contentGroup);
+  window.vrContentGroup = contentGroup;
+
+  // Anything added to window.scene while presenting (e.g. dropping a new
+  // .expt/.refl pair mid-session) needs to land in the scaled group too.
+  window._nonVRSceneAdd = scene.add.bind(scene);
+  scene.add = (object) => {
+    if (object === vrRig) {
+      return window._nonVRSceneAdd(object);
+    }
+    return contentGroup.add(object);
+  };
+
+  vrLastFrameTime = null;
+  window.renderer.setAnimationLoop(vrAnimate);
+}
+
+function onVRSessionEnd() {
+  const scene = window.scene;
+  const contentGroup = window.vrContentGroup;
+
+  if (window._nonVRSceneAdd) {
+    scene.add = window._nonVRSceneAdd;
+    window._nonVRSceneAdd = null;
+  }
+
+  if (contentGroup) {
+    for (const child of [...contentGroup.children]) {
+      scene.add(child); // scene.add is restored above; original transforms are unchanged
+    }
+    scene.remove(contentGroup);
+  }
+  window.vrContentGroup = null;
+
+  window.renderer.setAnimationLoop(null);
+  setVRHoverText(null);
+  window.viewer.requestRender();
+}
+
+function onVRSelectStart(controller) {
+  controller.userData.grabbing = true;
+  controller.userData.lastQuat = controller.quaternion.clone();
+}
+
+function onVRSelectEnd(controller) {
+  controller.userData.grabbing = false;
+  controller.userData.lastQuat = null;
+}
+
+function updateVRGrabRotation() {
+  const contentGroup = window.vrContentGroup;
+  if (!contentGroup || !window.vrControllers) return;
+  for (const controller of window.vrControllers) {
+    if (!controller.userData.grabbing || !controller.userData.lastQuat) continue;
+    // Apply the controller's incremental rotation directly to the content:
+    // turning your wrist turns the lattice by the same amount, continuously.
+    const delta = controller.quaternion.clone().multiply(
+      controller.userData.lastQuat.clone().invert()
+    );
+    contentGroup.quaternion.premultiply(delta);
+    controller.userData.lastQuat.copy(controller.quaternion);
+  }
+}
+
+function updateVRThumbstickControls(dt) {
+  const session = window.renderer.xr.getSession();
+  const contentGroup = window.vrContentGroup;
+  if (!session || !contentGroup || dt <= 0) return;
+
+  const deadzone = 0.15;
+  for (const source of session.inputSources) {
+    if (!source.gamepad) continue;
+    const axes = source.gamepad.axes;
+    if (axes.length < 4) continue;
+    const x = axes[2]; // thumbstick left/right
+    const y = axes[3]; // thumbstick fwd/back (WebXR: up/forward is negative)
+
+    if (Math.abs(x) > deadzone) {
+      contentGroup.rotation.y += x * dt * 1.2;
+    }
+    if (Math.abs(y) > deadzone) {
+      // Pushing the stick forward (negative y) zooms in. Untested on real
+      // hardware yet; flip the sign here if it feels backwards on-device.
+      const factor = 1 - y * dt * 0.8;
+      const newScale = THREE.MathUtils.clamp(
+        contentGroup.scale.x * factor,
+        VR_WORLD_SCALE * VR_MIN_SCALE_MULT,
+        VR_WORLD_SCALE * VR_MAX_SCALE_MULT
+      );
+      contentGroup.scale.setScalar(newScale);
+    }
+  }
+}
+
+function createVRHoverPanel() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(0.5, 0.125, 1);
+  sprite.position.set(0, -0.2, -0.6); // anchored in view, near the bottom
+  sprite.visible = false;
+  sprite.userData = { canvas, ctx, texture, lastText: undefined };
+  return sprite;
+}
+
+function setVRHoverText(text) {
+  const sprite = window.vrHoverPanel;
+  if (!sprite || sprite.userData.lastText === text) return;
+  sprite.userData.lastText = text;
+  const { canvas, ctx, texture } = sprite.userData;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!text) {
+    sprite.visible = false;
+    return;
+  }
+  sprite.visible = true;
+  ctx.fillStyle = 'rgba(2, 8, 23, 0.75)';
+  ctx.fillRect(4, 4, canvas.width - 8, canvas.height - 8);
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = '28px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  texture.needsUpdate = true;
+}
+
+function updateVRHover() {
+  const viewer = window.viewer;
+  const controller = window.vrControllers && window.vrControllers[0];
+  if (!viewer || !controller || !viewer.hasExperiment()) {
+    setVRHoverText(null);
+    return;
+  }
+
+  const origin = new THREE.Vector3();
+  const quat = new THREE.Quaternion();
+  controller.getWorldPosition(origin);
+  controller.getWorldQuaternion(quat);
+  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quat).normalize();
+  window.rayCaster.set(origin, direction);
+
+  const meshCollections = [];
+  if (viewer.indexedReflectionsCheckbox.checked) {
+    const mc = viewer.crystalView ? viewer.crystalIndexedReflections : viewer.indexedReflections;
+    for (const [id, reflectionSet] of mc) {
+      meshCollections.push({ id, reflectionSet, indexed: true });
+    }
+  }
+  if (viewer.unindexedReflectionsCheckbox.checked) {
+    for (const [id, reflectionSet] of viewer.unindexedReflections) {
+      meshCollections.push({ id, reflectionSet, indexed: false });
+    }
+  }
+
+  for (const { id, reflectionSet, indexed } of meshCollections) {
+    const intersects = window.rayCaster.intersectObject(reflectionSet.points);
+    if (intersects.length === 0) continue;
+    const idx = intersects[0].index;
+    const rlp = new THREE.Vector3(
+      reflectionSet.positions[3 * idx] / viewer.rLPScaleFactor,
+      reflectionSet.positions[3 * idx + 1] / viewer.rLPScaleFactor,
+      reflectionSet.positions[3 * idx + 2] / viewer.rLPScaleFactor
+    );
+    const dSpacing = (1 / rlp.length()).toFixed(3);
+    let text = `expt ${id}`;
+    if (indexed) {
+      const millerIndices = viewer.millerIndicesIndexed[id];
+      const hkl = millerIndices ? millerIndices[idx] : null;
+      text += hkl ? `  hkl (${hkl})` : '';
+    } else {
+      text += '  unindexed';
+    }
+    text += `  d=${dSpacing} Å`;
+    setVRHoverText(text);
+    return;
+  }
+  setVRHoverText(null);
+}
+
+function vrAnimate(time) {
+  const dt = vrLastFrameTime === null ? 0 : (time - vrLastFrameTime) / 1000;
+  vrLastFrameTime = time;
+
+  updateVRGrabRotation();
+  updateVRThumbstickControls(dt);
+  updateVRHover();
+
+  window.renderer.render(window.scene, window.vrCamera);
 }

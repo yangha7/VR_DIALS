@@ -591,14 +591,28 @@
 			"rlVLabels" : "white"
 	};
 
+	// Live streaming from a running DIALS session (dials_websockets_server_example.py)
+	// is opt-in via ?live=1 rather than automatic: a standalone VR headset has no
+	// local DIALS server to connect to, and shouldn't spend the session lifetime
+	// retrying a connection that will never succeed. Drag-and-drop .expt/.refl
+	// loading (standalone=true below) is the default path.
+	const liveStreamingRequested = new URLSearchParams(window.location.search).has("live");
+
 	window.onload = function(){
 		window.viewer = new ReciprocalLatticeViewer(
-			new ExptParser(), 
-			new ReflParser(), 
-			new ReflParser(), 
-			false,
+			new ExptParser(),
+			new ReflParser(),
+			new ReflParser(),
+			true,
 			colors
 		);
+
+		if (!liveStreamingRequested) {
+			setupScene();
+			window.viewer.updateTheme(localStorage.getItem("diffraview-theme") ?? "dark");
+			return;
+		}
+
 		const serverWSAddr = "ws://127.0.0.1:50010/";
 
 		window.viewer.serverWS = new WebSocket(serverWSAddr);
@@ -609,7 +623,7 @@
 
 		window.viewer.serverWS.send(JSON.stringify({
 			"channel": "server",
-			"command": "record_connection", 
+			"command": "record_connection",
 			"id": "rlv"
 			}
 		));
