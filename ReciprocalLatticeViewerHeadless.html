@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>DIALS Reciprocal Lattice Viewer</title>
+	<style>
+		body{
+			margin: 0
+		}
+		::-webkit-scrollbar { width: 6px; height: 6px; }
+		::-webkit-scrollbar-track { background: transparent; }
+		::-webkit-scrollbar-thumb { background: hsl(217.2 32.6% 28%); border-radius: 3px; }
+		::-webkit-scrollbar-thumb:hover { background: hsl(217.2 32.6% 40%); }
+		::-webkit-scrollbar-corner { background: transparent; }
+	</style>
+</head>
+<body>
+	<header id="headerText"> </header>
+	<sidebar id="sidebar" style="width: 260px; padding: 10px;">
+		<button id="sidebarToggle" onclick="window.viewer.toggleSidebar()" aria-label="Toggle sidebar">
+			❮
+		</button>
+		<script>
+			function updateUnindexedReflections(){
+				window.viewer.disableMouseClick(); 
+				window.viewer.updateUnindexedReflectionsVisibility()
+			}
+
+			function updateIndexedReflections(){
+				window.viewer.disableMouseClick(); 
+				window.viewer.updateIndexedReflectionsVisibility()
+			}
+
+			function updateCalculatedReflections(){
+				window.viewer.disableMouseClick(); 
+				window.viewer.updateCalculatedReflectionsVisibility()
+			}
+
+			function updateIntegratedReflections(){
+				window.viewer.disableMouseClick(); 
+				window.viewer.updateIntegratedReflectionsVisibility()
+			}
+
+			function updateReflectionSize(){
+				window.viewer.disableMouseClick();
+				window.viewer.updateReflectionSize();
+			}
+
+			function updateReciprocalCell(){
+				window.viewer.disableMouseClick();
+				window.viewer.updateReciprocalCellsVisibility();
+			}
+
+			function updateCrystalFrame(){
+				window.viewer.disableMouseClick();
+				window.viewer.updateCrystalFrame();
+			}
+
+			function updateEwaldSpheres(){
+				window.viewer.disableMouseClick();
+				window.viewer.updateEwaldSpheresVisibility();
+			}
+
+			function recalculateMesh(){
+				window.viewer.disableMouseClick(); 
+				window.viewer.recalculateMesh();
+			}
+
+			function updateMaxResolutionValue(){
+				window.viewer.disableMouseClick(); 
+				window.viewer.updateMaxResolutionValue();
+			}
+
+
+			function updateMesh(){
+				window.viewer.disableMouseClick(); 
+				window.viewer.updateMesh();
+			}
+
+			function updateThresholdValue(){
+				window.viewer.disableMouseClick();
+				window.viewer.updateMeshThresholdValue();
+			}
+
+			function updateMillerIndexLabels(){
+				window.viewer.disableMouseClick();
+				window.viewer.updateMillerIndexLabelsVisibility();
+			}
+
+			function updateMillerIndexLabelSize(){
+				window.viewer.disableMouseClick();
+				window.viewer.updateMillerIndexLabelSize();
+			}
+
+			function alignCameraToAxis(axisIndex){
+				window.viewer.alignCameraToRealSpaceAxis(axisIndex);
+			}
+
+		</script>
+		<div class="checkbox-row" id="unindexedReflectionsRow">
+		<span style="color: #aa9a9a"><b>unindexed reflections:</b></span><input type="checkbox"
+		id="unindexedReflectionsCheckbox"
+		onclick="updateUnindexedReflections()" disabled>
+		</div>
+
+		<div class="checkbox-row" id="indexedReflectionsRow">
+		<span style="color: #e74c3c"><b>indexed reflections:</b> </span><input type="checkbox"
+		id="indexedReflectionsCheckbox"
+		onclick="updateIndexedReflections()" disabled>
+		</div>
+
+		<div class="checkbox-row" id="calculatedReflectionsRow">
+		<span style="color: #ffaaaa"><b>calculated reflections:</b> </span><input type="checkbox"
+		id="calculatedReflectionsCheckbox"
+		onclick="updateCalculatedReflections()" disabled>
+		</div>
+
+		<div class="checkbox-row" id="integratedReflectionsRow">
+		<span style="color: #ffc25c"><b>integrated reflections:</b> </span><input type="checkbox"
+		id="integratedReflectionsCheckbox"
+		onclick="updateIntegratedReflections()" disabled>
+		</div>
+
+		<div class="checkbox-row" id="crystalFrameRow">
+		<b>crystal frame:</b><input type="checkbox"
+		id="crystalFrameCheckbox"
+		onclick="updateCrystalFrame()">
+		</div>
+
+		<div class="checkbox-row" id="reciprocalCellRow">
+		<b>reciprocal cell:</b><input type="checkbox" id="reciprocalCellCheckbox"
+		onclick="updateReciprocalCell()" disabled>
+		</div>
+
+		<div class="checkbox-row" id="millerIndexLabelsRow">
+		<b>Miller indices:</b><input type="checkbox" id="millerIndexLabelsCheckbox"
+		onclick="updateMillerIndexLabels()" disabled>
+		</div>
+
+		<div id="millerIndexLabelSizeContainer" class="slider-container">
+		<b>label size:</b>  <input type="range" min="5" max="50" value="8"
+		class="slider" id="millerIndexLabelSizeSlider"
+		onmouseup="updateMillerIndexLabelSize()">
+		</div>
+
+		<div id="unitCellAlignContainer" style="display:none; margin-bottom: 10px;">
+			<b>align camera to:</b>
+			<div class="axis-button-row">
+				<button class="axis-btn" onclick="alignCameraToAxis(0)">a*</button>
+				<button class="axis-btn" onclick="alignCameraToAxis(1)">b*</button>
+				<button class="axis-btn" onclick="alignCameraToAxis(2)">c*</button>
+			</div>
+		</div>
+
+		<div class="checkbox-row" id="ewaldSphereRow">
+		<b>Ewald spheres:</b><input type="checkbox" id="ewaldSphereCheckbox"
+		onclick="updateEwaldSpheres()" disabled>
+		</div>
+
+		<div id="reflectionSizeContainer" class="slider-container">
+		<b>reflection size:</b>  <input type="range" min="1" max="25" value="10" 
+		class="slider" id="reflectionSizeSlider" 
+		onmouseup="updateReflectionSize()">
+		</div>
+
+		<div id="meshThresholdContainer" class="slider-container">
+		<b style="color:#a8d5a2">mesh threshold:</b>
+		<input type="range" min=".1" max="1" value=".5" step="0.001"
+				class="slider" id="meshThresholdSlider"
+				onmouseup="updateMesh()" oninput="updateThresholdValue()">
+		<span id="meshThresholdValue"></span>
+		</div>
+
+		<div id="maxResolutionContainer" class="slider-container">
+		<b style="color:#a8d5a2">mesh max res:</b>
+		<input type="range" min=".1" max="6" value="1" step="0.001"
+				class="slider" id="maxResolutionSlider"
+				oninput="updateMaxResolutionValue()">
+		<span id="maxResolutionValue"></span>
+		</div>
+
+		<div id="meshGridSizeContainer" style="display:flex; align-items:center; gap:4px; margin-bottom:10px; overflow:hidden;">
+		<b style="color:#a8d5a2; flex-shrink:0; white-space:nowrap;">mesh grid:</b>
+		<div style="display:inline-flex; flex-wrap:nowrap; gap:4px; align-items:center;">
+			<label style="white-space:nowrap;"><input type="radio" name="meshGridSize" value="64"> 64</label>
+			<label style="white-space:nowrap;"><input type="radio" name="meshGridSize" value="128" checked> 128</label>
+			<label style="white-space:nowrap;"><input type="radio" name="meshGridSize" value="256"> 256</label>
+		</div>
+		</div>
+
+		<div id="meshRecalculateContainer" style="display:none; margin-top: 8px; margin-bottom: 10px;">
+		<button class="mesh-btn" onclick="recalculateMesh()">calculate mesh</button>
+		</div>
+
+		 <div class="dropdown">
+			<button id="selectionDropdownButton" onclick="window.viewer.toggleExperimentList()" class="dropbtn"><b>Orientations </b><i class="fa fa-chevron-right" id="dropdownIcon"></i></button>
+			<div id="selectionDropdown" class="dropdown-content">
+			</div>
+		</div> 
+	</sidebar>
+	<footer id="footerText"> </footer>
+	<button class="btn" id="closeExpt" onmouseout="window.viewer.stopDisplayingText()" onmouseover="window.viewer.displayImageFilenames()" onclick="window.viewer.clearExperiment()"><i class="fa fa-trash"></i> expt file</button>
+	<button class="btn" id="closeRefl" onmouseout="window.viewer.stopDisplayingText()" onmouseover="window.viewer.displayNumberOfReflections()" onclick="window.viewer.clearReflectionTable()"><i class="fa fa-trash"></i> refl file</button>
+		<style>
+		.slider {
+			margin-top: 0px;
+			vertical-align: middle;
+			appearance: none;
+			-webkit-appearance: none;
+			height: 6px;
+			background: #1e293b; /* Right side (unfilled) color */
+			border-radius: 5px;
+			/* For Firefox */
+			--fill-color: #f8fafc; /* Color for filled portion */
+		}
+
+		/* WebKit browsers (Chrome, Safari) */
+		.slider::-webkit-slider-thumb {
+			-webkit-appearance: none;
+			appearance: none;
+			width: 16px;
+			height: 16px;
+			border-radius: 50%;
+			background: black;
+			border: 2px solid #f8fafc;
+			cursor: pointer;
+			margin-top: -5px; /* Centers thumb on track */
+		}
+
+		.slider::-webkit-slider-runnable-track {
+			height: 6px;
+			background: linear-gradient(to right, var(--fill-color) 0%, var(--fill-color) var(--fill-percent), #444 var(--fill-percent), #444 100%);
+		}
+
+		/* Firefox */
+		.slider::-moz-range-thumb {
+			width: 16px;
+			height: 16px;
+			border-radius: 50%;
+			background: black;
+			border: 2px solid #f8fafc;
+			cursor: pointer;
+		}
+
+		.slider::-moz-range-progress {
+			height: 6px;
+			background: #f8fafc; /* Filled portion color */
+			border-radius: 5px;
+		}
+
+		.slider::-moz-range-track {
+			height: 6px;
+			background: #444; /* Unfilled portion color */
+			border-radius: 5px;
+		}
+		.experiment-label {
+			display: block;
+			background-color: rgba(0, 1, 0, 0.7);
+			color: white;
+			font-weight: bold;
+			padding: 10px;
+			cursor: pointer;
+			border: none;
+			width: 80%; 
+		}
+
+		.slider-container {
+		display: flex;
+		align-items: center;   
+		white-space: nowrap;  
+		margin-bottom: 10px; 
+		}
+		.slider-container b {
+			flex-shrink: 0;  
+		}
+		.slider-container input[type="range"] {
+			flex-grow: 1;
+			min-width: 50px;
+			max-width: 50%;
+		}
+		.radio-group {
+			display: flex;
+			gap: 8px;
+			margin-top: 4px;
+			flex-wrap: wrap;
+		}
+		.radio-group label {
+			cursor: pointer;
+		}
+
+		.dropbtn {
+		background-color: rgba(0,1,0,0.7);
+		color: #ddd;
+		font-family: Tahoma, Verdana, sans-serif;
+		padding: 16px;
+		margin-left: -6px;
+		margin-bottom: -50px;
+		font-size: 12px;
+		border-radius: 10px;
+		border-color:rgba(0,1,0,0.7);
+		padding: 10px 5px;
+		cursor: pointer;
+		}
+
+		.dropbtn:hover, .dropbtn:focus {
+		background-color: rgba(0,1,0,0.7);
+		}
+
+		.dropdown {
+		position: relative;
+		display: inline-block;
+		min-width: 100%;
+		min-height: 100%;
+		gap: 10px;
+		}
+
+		.dropdown-content {
+		display: none;
+		position: absolute;
+		background-color: rgba(0,1,0,0.7);
+		min-width: 105%;
+		max-height: 170px;
+		margin-left: -8px;
+		overflow-y: scroll;
+		overflow-x: hidden;
+		border-radius: 10px;
+		box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+		z-index: 1;
+		}
+
+		.dropdown-content a {
+		color: white;
+		padding: 12px 16px;
+		text-decoration: none;
+		display: block;
+		overflow-y: scroll;
+		overflow-x: hidden;
+		}
+
+		.dropdown a:hover {background-color: #ddd;}
+
+		.show {display: block;}
+		#headerText {
+			font-size: 16px;
+			font-family: Tahoma, Verdana, sans-serif;
+			color: #ddd;
+			background-color: rgba(0,1,0,0.7);
+			text-align: center;
+			position: absolute;
+			top: 10px;
+			left: 50%;
+			transform: translateX(-50%);
+			padding: 8px 8px;
+			border-radius: 10px;
+			z-index: 9;
+			white-space: pre-line;
+		}
+		#sidebar {
+			display: block;
+			font-family: Tahoma, Verdana, sans-serif;
+			font-size: 12px;
+			color: #ddd;
+			background-color: rgba(0,1,0,0.7);
+			position: absolute;
+			left: 20px;
+			top: 50%;
+			transform: translateY(-50%);
+			cursor: default;
+			padding: 8px 8px 20px;
+			border-radius: 10px;
+			z-index: 9;
+			line-height: 1.2;
+			max-height: calc(100vh - 40px);
+			overflow-y: auto;
+		}
+		#sidebar.hidden {
+		transform: translate(-280px, -50%);
+		overflow-y: hidden;
+		}
+		#sidebarToggle {
+			position: absolute;
+			right: 18px;
+			top: 50%;
+			transform: translateY(-50%);
+			background: none;
+			border: #fff;
+			color: #ddd;
+			font-size: 22px;
+			cursor: pointer;
+			padding: 0;
+			line-height: 1;
+		}
+		#sidebar.hidden #sidebarToggle {
+			transform: translateY(-50%) rotate(180deg);
+			right: 0px;
+		}
+
+		#sidebarToggle:hover {
+			opacity: 0.8;
+		}
+		.checkbox-row {
+			gap: 6px;
+			margin-bottom: 10px;
+		}
+		.axis-button-row {
+			display: flex;
+			gap: 6px;
+			margin-top: 4px;
+		}
+		.axis-btn {
+			background-color: transparent;
+			color: #ddd;
+			font-family: Tahoma, Verdana, sans-serif;
+			font-size: 12px;
+			border: 1px solid #555;
+			border-radius: 6px;
+			padding: 3px 10px;
+			cursor: pointer;
+			flex: 1;
+		}
+		.axis-btn:hover {
+			background-color: rgba(255, 255, 255, 0.1);
+			border-color: #aaa;
+		}
+		.mesh-btn {
+			background-color: #a8d5a2;
+			color: #1a3a1a;
+			font-family: Tahoma, Verdana, sans-serif;
+			font-size: 12px;
+			font-weight: bold;
+			border: 2px solid #ffffff;
+			border-radius: 6px;
+			padding: 3px 10px;
+			cursor: pointer;
+			width: fit-content;
+			white-space: nowrap;
+		}
+		.mesh-btn:hover {
+			background-color: #8fc889;
+		}
+
+		#closeExpt{
+			display: none;
+			font-family: Tahoma, Verdana, sans-serif;
+			font-size: 14px;
+			color: #ddd;
+			background-color: rgba(0,1,0,0.7);
+			position: absolute;
+			left: 1%;
+			top: 5%;
+			cursor: pointer;
+			padding: 8px 8px 8px;
+			border-radius: 10px;
+			z-index: 9;
+			line-height: .7;
+		}
+		#closeRefl{
+			display: none;
+			font-family: Tahoma, Verdana, sans-serif;
+			font-size: 14px;
+			color: #ddd;
+			background-color: rgba(0,1,0,0.7);
+			position: absolute;
+			left: 1%;
+			top: 10%;
+			cursor: pointer;
+			padding: 8px 8px 8px;
+			border-radius: 10px;
+			z-index: 9;
+			line-height: .7;
+		}
+		#reflectionSize{
+			position: relative;
+			top:8px;
+		}
+		</style>
+	<script type="module">
+	import { ReciprocalLatticeViewer, setupScene } from "./src/js/ReciprocalLatticeViewer.js";
+	import { ExptParser } from "dials_javascript_parser/ExptParser.js";
+	import { ReflParser } from "dials_javascript_parser/ReflParser.js";
+	import { deserialize, decode } from "@ygoe/msgpack";
+
+	function isRLVMsg(msg){
+		return "channel" in msg && msg["channel"] == "rlv";
+	}
+
+	function connectWebSocket(serverWSAddr) {
+		function attemptConnection() {
+			window.viewer.serverWS = new WebSocket(serverWSAddr);
+
+			window.viewer.serverWS.onopen = () => {
+				console.log('RLV opened Connection to server');
+
+				const checkReadyState = () => {
+					if (window.viewer.serverWS.readyState === WebSocket.OPEN) {
+						window.viewer.serverWS.send(JSON.stringify({
+							"channel": "server",
+							"command": "record_connection", 
+							"id": "rlv"
+						}));
+						console.log("RLV connected successfully")
+					} else {
+						console.error('WebSocket is not open. Retrying...');
+						setTimeout(checkReadyState, 1000); 
+					}
+				};
+
+				checkReadyState();
+			};
+
+			window.viewer.serverWS.onerror = (error) => {
+				console.error('WebSocket error: ', error);
+				setTimeout(() => {
+					console.log('Retrying connection...');
+					attemptConnection();
+				}, 5000); 
+			};
+
+			window.viewer.serverWS.onclose = () => {
+				console.log('WebSocket connection closed. Retrying...');
+				setTimeout(() => {
+					attemptConnection();
+				}, 5000); 
+			};
+		}
+
+		attemptConnection();
+	}
+
+
+	const colors = {
+			"background": 0x020817,
+      "backgroundLight": 0xc6ccd2,
+			"sample": 0xfdf6e3,
+			"reflectionUnindexed": [
+				0x96f97b,
+				0x75bbfd,
+				0xbf77f6,
+				0x13eac9,
+				0xffb07c,
+				0xffd1df,
+				0xd0fefe,
+				0xffff84,
+				0xffffff,
+				0xff9408,
+				0x01f9c6,
+				0xaefd6c,
+				0xfe0002,
+				0x990f4b,
+				0x78d1b6,
+				0xfff917,
+				0xff0789,
+				0xd4ffff,
+				0x69d84f,
+				0x56ae57
+			],
+			"reflectionCrystalIndexed": [
+				0x96f97b,
+				0x75bbfd,
+				0xbf77f6,
+				0x13eac9,
+				0xffb07c,
+				0xffd1df,
+				0xd0fefe,
+				0xffff84,
+				0xffffff,
+				0xff9408,
+				0x01f9c6,
+				0xaefd6c,
+				0xfe0002,
+				0x990f4b,
+				0x78d1b6,
+				0xfff917,
+				0xff0789,
+				0xd4ffff,
+				0x69d84f,
+				0x56ae57
+			],
+			"reflectionIndexed": 0xe74c3c,
+			"reflectionCrystalUnindexed": 0x6a7688,
+			"reciprocalMesh": 0xFFFFFF,
+			"reflectionCalculated": 0xffaaaa,
+			"reflectionIntegrated" : 0xffc25c,
+			"highlight": 0xFFFFFF,
+			"resolutionCircle": 0x6a7688,
+			"beam": 0xFFFFFF,
+			"reciprocalCell": 0xFFFFFF,
+			"rlVLabels" : "white"
+	};
+
+	window.onload = function(){
+		window.viewer = new ReciprocalLatticeViewer(
+			new ExptParser(), 
+			new ReflParser(), 
+			new ReflParser(), 
+			false,
+			colors
+		);
+		const serverWSAddr = "ws://127.0.0.1:50010/";
+
+		window.viewer.serverWS = new WebSocket(serverWSAddr);
+		window.viewer.serverWS.binaryType = "arraybuffer";
+
+		window.viewer.serverWS.onopen = () => {
+			console.log('Reciprocal lattice viewer opened Connection to server');
+
+		window.viewer.serverWS.send(JSON.stringify({
+			"channel": "server",
+			"command": "record_connection", 
+			"id": "rlv"
+			}
+		));
+
+
+		};
+
+		window.viewer.serverWS.onclose = () => {
+			console.log('Reciprocal lattice viewer closed Connection to server');
+		};
+
+
+		window.viewer.serverWS.onmessage = (event) => {
+
+			let data = event.data;
+			console.log("msg received", data);
+
+			if (data instanceof ArrayBuffer){ // msgpack
+				const bytes = new Uint8Array(data);
+				try{
+					const decoded = decode(bytes)
+					let command = decoded.command;
+					console.log("Command: ", command);
+					switch(command){
+						case "update_mesh":
+							window.viewer.addContourMeshFromData(
+								decoded.mesh_data,
+								decoded.mesh_dimensions,
+								decoded.rlp_min,
+								decoded.rlp_max,
+								decoded.rlp_step
+							);
+							break;
+
+					}
+					return;
+				}catch(e){
+					console.error("Invalid Msgpack", e);
+					return;
+
+				}
+			}
+
+			const msg = JSON.parse(event.data);
+
+			if (!isRLVMsg(msg)){
+				return;
+			}
+
+			const command = msg["command"];
+			console.log("Command: ", command);
+
+			switch(command){
+				case "new_experiment":
+					window.viewer.addExperimentFromJSONString(
+						msg,
+						true
+					);
+					break;
+				case "update_experiment":
+					window.viewer.addExperimentFromJSONString(
+						msg,
+						false
+					);
+				break;
+				case "clear_experiment":
+					window.viewer.clearExperiment();
+					break;
+				case "clear_reciprocal_cells":
+					window.viewer.clearReciprocalCells();
+					break;
+				case "update_reflection_table":
+					window.viewer.addReflectionsFromJSONMsgpack(msg["refl_msgpack"]);
+					break;
+				case "update_calculated_integrated_reflection_table":
+					window.viewer.addCalculatedIntegratedReflectionsFromJSONMsgpack(msg["refl_msgpack"]);
+					break;
+				case "show_rlv_orientation_view":
+					window.viewer.switchToOrientationView();
+					break;
+				case "show_rlv_crystal_view":
+					window.viewer.switchToCrystalView();
+					break;
+				case "show_rlv_resolution_view":
+					window.viewer.switchToResolutionView();
+					break;
+				case "toggle_sidebar":
+					window.viewer.toggleSidebar();
+					break;
+				case "update_mesh":
+					window.viewer.addContourMeshFromData(
+					msg["mesh_data"],
+					msg["mesh_dimensions"],
+					msg["rlp_min"],
+					msg["rlp_max"],
+					msg["rlp_step"]
+					);
+					break;
+				case "show_mesh":
+					window.viewer.updateMeshVisibility(true)
+					break;
+				case "hide_mesh":
+					window.viewer.updateMeshVisibility(false)
+					break;
+				case "cancel_mesh":
+					window.viewer.cancelMesh();
+					break;
+				case "highlight_reflection":
+					window.viewer.highlightReflection(msg["rlp"]);
+					break;
+				case "update_theme":
+					window.viewer.updateTheme(msg["theme"]);
+					break;
+				default:
+					console.warn("Unrecognised command ", command);
+			}
+
+
+
+		};
+
+		setupScene();
+		window.viewer.updateTheme(localStorage.getItem("diffraview-theme") ?? "dark");
+	}
+	</script>
+
+	
+</body>
+</html>

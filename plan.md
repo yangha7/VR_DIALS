@@ -1,0 +1,122 @@
+# VR DIALS Reciprocal Lattice Viewer — Project Plan
+
+## Goal
+
+Rewrite `dials.reciprocal_lattice_viewer` (DIALS's wxPython/PyOpenGL reciprocal-space
+viewer, laggy when rotating large reflection sets) as a WebXR app for standalone
+Meta Quest 3, building on prior work: [X-ray Diffraction Simulator / Crystal Lab VR](
+https://yangha7.github.io/X-ray_Diffraction_Simulator/vr_viewer.html), an idealized
+textbook-equation reciprocal space demo already proven on Quest 3.
+
+The new viewer visualizes *real* experimental DIALS output (strong spots, indexed/
+integrated reflections, actual detector/goniometer geometry) rather than synthetic
+textbook data.
+
+## Why the DIALS viewer lags (and why that's fixable)
+
+`dials.reciprocal_lattice_viewer` (`dials/src/dials/command_line/reciprocal_lattice_viewer.py`)
+uses wxPython + PyOpenGL: old-style immediate-mode-ish rendering, per-frame Python-side
+work, no modern GPU buffer geometry. This is a solved problem in WebGL terms — the
+existing Crystal Lab VR demo already renders thousands of GPU-driven point sprites
+(`THREE.Points` + custom vertex/fragment shader) at VR-friendly framerates.
+
+## Key existing assets (don't rebuild these)
+
+1. **Crystal Lab VR demo** (`vr_viewer.html`) — proven Quest 3 WebXR shell:
+   - WebXR session setup, "Enter VR" button, controller models, laser-pointer raycasting
+   - Trigger-drag sliders, drag-to-reorient with momentum
+   - GPU shader-based point sprites for reciprocal lattice points
+   - Canvas-texture panels for HUD/text (DOM overlays don't render in WebXR)
+   - Instanced meshes for atoms, Ewald sphere wireframe, detector panel w/ canvas texture
+
+2. **[toastisme/dials_browser_rlv](https://github.com/toastisme/dials_browser_rlv)** —
+   existing browser port of the real DIALS viewer (desktop only, no VR):
+   - Vite + Three.js r172 project
+   - `.expt` files load directly as JSON
+   - `.refl` files (DIALS `flex.reflection_table`) exported via `.as_msgpack()`,
+     decoded client-side with `@ygoe/msgpack` + `dials_javascript_parser`
+     (understands DIALS column layout: Miller indices, xyz obs/calc, panel, etc.)
+   - Features: reciprocal cell display, reflection centroids, hover-for-hkl,
+     calculated-vs-observed comparison, multi-experiment support
+   - Also ships `dials_websockets_server_example.py` / `dials_http_server_example.py` —
+     a live bridge that pushes `update_experiment`/`update_reflection_table` messages
+     from a running DIALS/Python session to the browser (streaming-during-collection,
+     not needed for v1 but architected for)
+
+## Decisions locked in (2026-09-04)
+
+| Question | Decision |
+|---|---|
+| Render target | **Standalone on Quest 3** (on-device mobile GPU, Snapdragon XR2 Gen 2) — no PC tether/Link streaming assumed |
+| Data loading for v1 | **Static file load** — drag-and-drop a finished `.expt`/`.refl` pair, like `dials_browser_rlv` today. Live websockets streaming deferred to a later phase, not designed out |
+| Base codebase | **Fork `dials_browser_rlv`** and graft WebXR onto its existing Three.js scene, inheriting its working `.refl`/`.expt` parsing instead of rewriting a DIALS data loader |
+| Target dataset scale for v1 | **Start small** — a modest still/narrow-wedge dataset (~10³–10⁴ strong spots). Large fine-sliced dataset performance (~10⁵–10⁶ spots) is an explicit later phase, not a v1 design constraint |
+
+## Central open risk
+
+GPU point budget on Quest 3's mobile chipset for standalone rendering. Desktop
+PyOpenGL being laggy at a given spot count says nothing reassuring about a mobile
+GPU at the same count. This is a **benchmark**, not an assumption — deferred to
+Phase 2 once the small-dataset MVP works, rather than speculatively over-designed
+(e.g. premature LOD/binning) in Phase 1.
+
+## Phases
+
+### Phase 0 — Scaffolding
+- Fork `dials_browser_rlv`, get its existing Vite dev build running locally
+- Confirm drag-and-drop `.expt`/`.refl` loading works unmodified (validates the
+  inherited data pipeline before any VR work starts)
+
+### Phase 1 — WebXR MVP (small dataset, standalone)
+- Add a WebXR session to the existing Three.js scene (`renderer.xr.enabled`,
+  "Enter VR" button, controller models + laser-pointer raycasting — ported from
+  `vr_viewer.html`)
+- Test against a modest dataset (~10³–10⁴ spots) so performance isn't yet a variable
+- Core v1 feature set (mapped from the real viewer's most-used options):
+  - Reciprocal lattice points as GPU point sprites (reuse existing point shader;
+    check whether the desktop viewer's point rendering can be reused directly or
+    needs adapting)
+  - Color/filter: indexed vs. unindexed vs. integrated (`display` option)
+  - `d_min` resolution cutoff as a VR-manipulable control (thumbstick or
+    trigger-drag slider)
+  - Toggles: reciprocal cell edges, beam vector, rotation axis
+  - Controller-raycast hover/select → canvas-texture panel showing hkl + resolution
+    (VR analog of the desktop hover-for-hkl feature)
+  - Grab-to-rotate / two-handed scale of the lattice (real hand manipulation —
+    a place VR is strictly better than mouse interaction, not just parity)
+
+### Phase 2 — Scale it up, deliberately
+- Bring in a real fine-sliced dataset, benchmark on-device
+- Whatever breaks first (framerate / load time / memory) determines the fix:
+  image-range binning (draw only the currently-relevant `z`/image slice, like a
+  time-scrubber), resolution-shell LOD, or batching efficiency improvements
+- Avoid designing LOD speculatively before the actual bottleneck is known
+
+### Phase 3 — Live streaming (deferred, not discarded)
+- Wire in the websockets bridge (`dials_websockets_server_example.py`) to watch
+  spots populate during an actual data collection
+- Phase 1–2 should keep reflection-data ingestion decoupled from its source
+  (drag-and-drop vs. socket push) so this doesn't require a rewrite
+
+### Phase 4 — VR-native stretch goals
+Things structurally hard on a 2D desktop viewer but natural in a headset:
+- Side-by-side comparison of multiple experiments in physical space
+- Combined reciprocal-space + real-space/detector view simultaneously
+  (per the Crystal Lab VR demo's front/behind panel layout)
+- Ewald-sphere overlay against observed spots for visual indexing diagnostics
+
+## Access / resources needed from user
+
+- **GitHub**: none needed yet to *start* — forking `dials_browser_rlv` and working
+  locally doesn't require access to the user's account. Will need push access to
+  the user's own GitHub (or a repo to push to) once ready to publish/deploy
+  (e.g. via GitHub Pages, matching how the Crystal Lab VR demo is hosted).
+- **`dials.lbl.gov` SSH access**: needed once Phase 0/1 needs a real `.expt`/`.refl`
+  pair to test against, and definitely for Phase 2 (real fine-sliced dataset) and
+  Phase 3 (live DIALS session to stream from). Not required to begin Phase 0
+  scaffolding with the fork itself.
+
+## Status
+
+Plan written 2026-09-04. Next step: Phase 0 — fork `dials_browser_rlv` and verify
+the existing desktop viewer runs locally.
