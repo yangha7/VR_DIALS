@@ -22,16 +22,16 @@
 		<b>mouse wheel</b> = zoom<br>
 		-------------------------------------------------------<br>
 		<span style="color: #ddd"><b>Unindexed Reflections:</b></span><input type="checkbox" 
-		id="observedUnindexedReflections", checked=false, 
-		onclick="window.viewer.updateObservedUnindexedReflections()", disabled=true>
-		<span style="color: #e74c3c"><b>Indexed Reflections:</b> </span><input type="checkbox" 
-		id="observedIndexedReflections", checked=false, 
-		onclick="window.viewer.updateObservedIndexedReflections()", disabled=true>
-		<span style="color: #ffaaaa"><b>Calculated Reflections:</b> </span><input type="checkbox" 
-		id="calculatedReflections", checked=false, 
-		onclick="window.viewer.updateCalculatedReflections()", disabled=true>
-		<b>Reciprocal Cell:</b><input type="checkbox" id="reciprocalCell", 
-		checked=false, onclick="window.viewer.updateReciprocalCell()", disabled=false>
+		id="observedUnindexedReflections" checked=false
+		onclick="window.viewer.updateObservedUnindexedReflections()" disabled=true>
+		<span style="color: #e74c3c"><b>Indexed Reflections:</b> </span><input type="checkbox"
+		id="observedIndexedReflections" checked=false
+		onclick="window.viewer.updateObservedIndexedReflections()" disabled=true>
+		<span style="color: #ffaaaa"><b>Calculated Reflections:</b> </span><input type="checkbox"
+		id="calculatedReflections" checked=false
+		onclick="window.viewer.updateCalculatedReflections()" disabled=true>
+		<b>Reciprocal Cell:</b><input type="checkbox" id="reciprocalCell"
+		checked=false onclick="window.viewer.updateReciprocalCell()" disabled=false>
 		<b>Reflection Size:</b>  <input type="range" min="1" max="25" value="10" 
 		class="slider" id="reflectionSize" 
 		onmouseup="window.viewer.updateReflectionSize()">
