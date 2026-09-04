@@ -192,6 +192,25 @@ Next step: get a `.expt`/`.refl` pair (even a small/synthetic one) onto the
 Quest 3's browser and actually try it, then tune the above against what's
 actually seen on-device.
 
+## Deployment
+
+- **Repo**: [github.com/yangha7/VR_DIALS](https://github.com/yangha7/VR_DIALS)
+  (`main` branch has the full history above; `gh-pages` branch is the built
+  output, deployed via the inherited `npm run deploy` → `gh-pages -d dist`).
+- **Live URL**: https://yangha7.github.io/VR_DIALS/ReciprocalLatticeViewerHeadless.html
+  (same pattern as the existing `X-ray_Diffraction_Simulator` demo — served
+  from the built filename, not a bare `index.html` at the repo root). GitHub
+  Pages needed enabling once manually in repo Settings → Pages (source:
+  `gh-pages` branch, root) — pushing to that branch alone didn't turn it on
+  for a brand-new repo.
+- Verified 2026-09-04 via headless Chromium against the live URL: HTTPS/secure
+  context confirmed (required for WebXR to activate at all), all assets
+  resolve, zero console/page errors, XR scaffolding initializes. Still
+  untested on an actual Quest 3 — see the on-device checklist above.
+- To redeploy after further changes: `npm run build && npm run deploy` from
+  this directory, then re-check the live URL (Pages typically updates within
+  well under a minute of the `gh-pages` branch changing).
+
 ## Access needed from user (open)
 
 - **GitHub**: no access needed to reach this point. Will need a repo to push to
