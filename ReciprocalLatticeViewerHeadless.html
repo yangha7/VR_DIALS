@@ -610,6 +610,28 @@
 		if (!liveStreamingRequested) {
 			setupScene();
 			window.viewer.updateTheme(localStorage.getItem("diffraview-theme") ?? "dark");
+
+			// TEMPORARY test scaffolding: auto-loads the bundled sample dataset
+			// (a 30-image/1316-reflection slice of a real insulin rotation
+			// dataset -- see sample-data/ and plan.md) so there's something to
+			// look at on a Quest 3 headset without relying on HTML5
+			// drag-and-drop, which is a desktop mouse paradigm of uncertain
+			// support in the Quest Browser. Remove this block once a real
+			// load-data UI (e.g. a file picker button, which works via the
+			// Android file picker on-device) replaces it.
+			(async () => {
+				try {
+					const [exptBlob, reflBlob] = await Promise.all([
+						fetch("sample-data/indexed_1_30.expt").then((r) => r.blob()),
+						fetch("sample-data/indexed_1_30.refl").then((r) => r.blob()),
+					]);
+					await window.viewer.addExperiment(new File([exptBlob], "indexed_1_30.expt"));
+					await window.viewer.addReflectionTable(new File([reflBlob], "indexed_1_30.refl"));
+				} catch (e) {
+					console.error("Failed to auto-load sample test data", e);
+				}
+			})();
+
 			return;
 		}
 
