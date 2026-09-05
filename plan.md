@@ -210,9 +210,31 @@ Things structurally hard on a 2D desktop viewer but natural in a headset:
     display) as unverified until actually tried, not just "should work because
     the code is there."
 
+- 2026-09-04: Swapped the loading mechanism for the live deployment, for
+  testing convenience. HTML5 drag-and-drop is a desktop mouse paradigm with
+  unknown support in the Quest Browser and fiddly to test either way, so
+  rather than debug that on-device right now, the deployed page **auto-loads
+  `sample-data/indexed_1_30.expt`/`.refl` on open**, through the same
+  `addExperiment`/`addReflectionTable` calls drag-and-drop already used (no
+  new data-handling logic — copied to `resources/sample-data/` so Vite's
+  `publicDir` bundles it into the deployed build). This is explicitly
+  **temporary test scaffolding**, flagged as such at the call site, not the
+  real load-data feature — **the live URL no longer starts on an empty
+  "drag files here" scene for anyone who visits it**; it always shows this
+  one sample dataset until the scaffolding is replaced. When a real
+  loading UI gets built (a file picker button is the likely answer, since
+  it works via the Android file picker on-device, unlike drag-and-drop),
+  this block should be removed outright, not left alongside it.
+
 ## Needs on-device verification (Quest 3) — not yet checked
 
-- Does "Enter VR" actually appear and start a session at all.
+- ~~Does "Enter VR" actually appear and start a session at all~~ — confirmed
+  working (empty scene, visible controller laser). Everything below was
+  checked against an *empty* scene; none of it has been tried with the
+  now-auto-loaded reflection data yet.
+- Does the auto-loaded reflection data actually render and look like
+  anything sensible in the headset (the first real test of `VR_WORLD_SCALE`/
+  `VR_CONTENT_DISTANCE` against real geometry, not a guess).
 - `VR_WORLD_SCALE` (1/300) and `VR_CONTENT_DISTANCE` (1.2m) defaults — first
   real look at whether the lattice lands at a comfortable size/distance.
 - Controller-ray hover accuracy (hitting individual reflection points with
