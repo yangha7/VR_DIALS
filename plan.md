@@ -174,6 +174,42 @@ Things structurally hard on a 2D desktop viewer but natural in a headset:
     available in headless Chromium, so the actual VRButton-appears /
     on-headset-rendering path is **unverified** — needs a real Quest 3 check.
 
+- 2026-09-04: First real data. Pulled a small sample from
+  `dials.lbl.gov:/net/dials/raid1/yangha/Tutorial/agent_test` (a 1200-image,
+  full-scale insulin rotation dataset — its `indexed.refl`/`integrated.refl`
+  are 86–122MB, well beyond our Phase 1 "start small" target) and used
+  `dials.slice_sequence` there to cut a 30-image/1316-reflection subset,
+  saved locally as `sample-data/indexed_1_30.expt`/`.refl` (kept in-repo,
+  ~2MB, so re-testing doesn't need SSH access again). Loading it surfaced
+  drag-and-drop was completely broken — three separate upstream API drifts
+  between `ReciprocalLatticeViewer.js` and its unpinned
+  `dials_javascript_parser` dependency, all pre-existing and unrelated to
+  the VR work, just never exercised before because drag-and-drop was
+  disabled on the one page wired into the build (see the Phase 1 entry
+  above). Fixed: a renamed parser method, a reflection-position-building
+  path built against a data shape the parser no longer produces (routed
+  through the same, already-correct code path the live-streaming feature
+  uses instead of patching the stale one), and a missing `this.crystals`
+  populate step in the parser's file-based experiment loader (compensated
+  for in our own calling code rather than patching the vendored dependency).
+  Also fixed a related non-blocking display bug found by the same audit
+  (`displayNumberOfReflections` read a property that doesn't exist).
+  Verified via a simulated drag-and-drop in headless Chromium: zero errors,
+  and the loaded reflection count (1316) matches `flex.reflection_table`'s
+  own count for the same file exactly.
+  - **Known, not fixed**: `addCalculatedIntegratedReflectionsFromData` (part
+    of the not-yet-built live "calculated reflections" streaming feature)
+    has the same stale-data-shape assumption as the bug above, plus
+    references to `this.expt.scan`/a bare `goniometer` that don't resolve
+    on `ExptParser`. It has no current caller (dead code), so left as-is —
+    needs the same "route through the modern flat-getter API" treatment
+    when Phase 3 (live streaming) actually gets built.
+  - Given how much silent API drift turned up from one previously-untested
+    code path, worth treating any *other* not-yet-exercised feature (mesh
+    generation, crystal view, calculated/integrated overlays, multi-experiment
+    display) as unverified until actually tried, not just "should work because
+    the code is there."
+
 ## Needs on-device verification (Quest 3) — not yet checked
 
 - Does "Enter VR" actually appear and start a session at all.
