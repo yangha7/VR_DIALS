@@ -3296,18 +3296,11 @@ function setVRHoverText(text) {
 
 function updateVRHover() {
   const viewer = window.viewer;
-  const controller = window.vrControllers && window.vrControllers[0];
-  if (!viewer || !controller || !viewer.hasExperiment()) {
+  const controllers = window.vrControllers;
+  if (!viewer || !controllers || !viewer.hasExperiment()) {
     setVRHoverText(null);
     return;
   }
-
-  const origin = new THREE.Vector3();
-  const quat = new THREE.Quaternion();
-  controller.getWorldPosition(origin);
-  controller.getWorldQuaternion(quat);
-  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quat).normalize();
-  window.rayCaster.set(origin, direction);
 
   const meshCollections = [];
   if (viewer.indexedReflectionsCheckbox.checked) {
@@ -3322,27 +3315,40 @@ function updateVRHover() {
     }
   }
 
-  for (const { id, reflectionSet, indexed } of meshCollections) {
-    const intersects = window.rayCaster.intersectObject(reflectionSet.points);
-    if (intersects.length === 0) continue;
-    const idx = intersects[0].index;
-    const rlp = new THREE.Vector3(
-      reflectionSet.positions[3 * idx] / viewer.rLPScaleFactor,
-      reflectionSet.positions[3 * idx + 1] / viewer.rLPScaleFactor,
-      reflectionSet.positions[3 * idx + 2] / viewer.rLPScaleFactor
-    );
-    const dSpacing = (1 / rlp.length()).toFixed(3);
-    let text = `expt ${id}`;
-    if (indexed) {
-      const millerIndices = viewer.millerIndicesIndexed[id];
-      const hkl = millerIndices ? millerIndices[idx] : null;
-      text += hkl ? `  hkl (${hkl})` : '';
-    } else {
-      text += '  unindexed';
+  const origin = new THREE.Vector3();
+  const quat = new THREE.Quaternion();
+  // Check both controllers -- whichever hand is actually pointing at
+  // something wins. Previously this only ever read vrControllers[0] (a
+  // single, arbitrary hand per however WebXR happened to enumerate input
+  // sources), which is why the label appeared to work inconsistently.
+  for (const controller of controllers) {
+    controller.getWorldPosition(origin);
+    controller.getWorldQuaternion(quat);
+    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quat).normalize();
+    window.rayCaster.set(origin, direction);
+
+    for (const { id, reflectionSet, indexed } of meshCollections) {
+      const intersects = window.rayCaster.intersectObject(reflectionSet.points);
+      if (intersects.length === 0) continue;
+      const idx = intersects[0].index;
+      const rlp = new THREE.Vector3(
+        reflectionSet.positions[3 * idx] / viewer.rLPScaleFactor,
+        reflectionSet.positions[3 * idx + 1] / viewer.rLPScaleFactor,
+        reflectionSet.positions[3 * idx + 2] / viewer.rLPScaleFactor
+      );
+      const dSpacing = (1 / rlp.length()).toFixed(3);
+      let text = `expt ${id}`;
+      if (indexed) {
+        const millerIndices = viewer.millerIndicesIndexed[id];
+        const hkl = millerIndices ? millerIndices[idx] : null;
+        text += hkl ? `  hkl (${hkl})` : '';
+      } else {
+        text += '  unindexed';
+      }
+      text += `  d=${dSpacing} Å`;
+      setVRHoverText(text);
+      return;
     }
-    text += `  d=${dSpacing} Å`;
-    setVRHoverText(text);
-    return;
   }
   setVRHoverText(null);
 }
