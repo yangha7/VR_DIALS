@@ -3052,6 +3052,33 @@ const VR_WORLD_SCALE = 1 / 300;
 const VR_MIN_SCALE_MULT = 0.2;
 const VR_MAX_SCALE_MULT = 5;
 const VR_CONTENT_DISTANCE = 1.2; // metres in front of the rig
+const VR_POINT_SIZE = 0.03; // ~3cm reflection dots at VR content scale; untested, tune on-device
+
+// THREE.PointsMaterial's `size` is a raw shader uniform, not a transform --
+// unlike vertex positions it does NOT get scaled by an ancestor's
+// scale.setScalar() (which is how VR_WORLD_SCALE shrinks everything else).
+// It's also only distance-attenuated under a *perspective* projection
+// (three.js's points_vertex shader checks isPerspectiveMatrix and skips
+// attenuation entirely for the desktop OrthographicCamera). So a `size`
+// tuned to look like a small dot on desktop (orthographic, unattenuated,
+// effectively a fixed pixel size) becomes a screen-filling quad in VR
+// (perspective, attenuated by a distance that's now only ~1-2m because the
+// content itself was scaled down): size stays the same, distance shrinks,
+// and gl_PointSize = size * scale / -mvPosition.z blows up. Point size has
+// to be re-tuned specifically for VR's real-world-scale viewing distance.
+function applyVRPointSize(object) {
+  if (!object.isPoints || !object.material) return;
+  object.userData.desktopPointSize = object.material.size;
+  object.material.size = VR_POINT_SIZE;
+  object.material.needsUpdate = true;
+}
+
+function restoreDesktopPointSize(object) {
+  if (!object.isPoints || !object.material || object.userData.desktopPointSize === undefined) return;
+  object.material.size = object.userData.desktopPointSize;
+  object.material.needsUpdate = true;
+  delete object.userData.desktopPointSize;
+}
 
 let vrLastFrameTime = null;
 
@@ -3134,15 +3161,19 @@ function onVRSessionStart() {
   }
   scene.add(contentGroup);
   window.vrContentGroup = contentGroup;
+  contentGroup.traverse(applyVRPointSize);
 
   // Anything added to window.scene while presenting (e.g. dropping a new
-  // .expt/.refl pair mid-session) needs to land in the scaled group too.
+  // .expt/.refl pair mid-session) needs to land in the scaled group too,
+  // sized correctly for VR the same way the reparented content just was.
   window._nonVRSceneAdd = scene.add.bind(scene);
   scene.add = (object) => {
     if (object === vrRig) {
       return window._nonVRSceneAdd(object);
     }
-    return contentGroup.add(object);
+    contentGroup.add(object);
+    object.traverse(applyVRPointSize);
+    return contentGroup;
   };
 
   vrLastFrameTime = null;
@@ -3159,6 +3190,7 @@ function onVRSessionEnd() {
   }
 
   if (contentGroup) {
+    contentGroup.traverse(restoreDesktopPointSize);
     for (const child of [...contentGroup.children]) {
       scene.add(child); // scene.add is restored above; original transforms are unchanged
     }
