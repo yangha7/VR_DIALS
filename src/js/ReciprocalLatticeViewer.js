@@ -5,6 +5,18 @@ import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerM
 import { gsap } from "gsap";
 import { MeshLineGeometry,  MeshLineMaterial, raycast } from 'meshline';
 
+function arrayBufferToBase64(buffer) {
+  // Chunked to avoid blowing the call-stack limit on String.fromCharCode
+  // for large reflection tables (integrated.refl-scale files run 100+ MB).
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 class MeshCollection{
 
   /*
@@ -938,6 +950,11 @@ export class ReciprocalLatticeViewer {
     this.clearExperiment();
     this.clearReflectionTable();
     await this.expt.parseExperiment(file);
+    // dials_javascript_parser's file-based parseExperiment() doesn't populate
+    // this.crystals the way its JSON-string counterpart (parseExperimentJSON)
+    // does -- without it, getCrystalU() throws for any indexed reflection.
+    // Filling it in here rather than patching the vendored dependency.
+    this.expt.crystals = this.expt.getAllCrystals();
     console.assert(this.hasExperiment());
     this.addBeam();
     this.addSample();
@@ -1032,325 +1049,22 @@ export class ReciprocalLatticeViewer {
   }
 
   addReflectionTable = async (file) => {
-    this.clearReflectionTable();
-    await this.refl.parseReflectionTable(file);
-    this.addReflections();
+    // Routed through the same reflection-building path as the live/websocket
+    // JSON-msgpack updates (addReflectionsFromJSONMsgpack), which is kept
+    // up to date with dials_javascript_parser's current ReflParser API
+    // (flat getPanelNumbers()/getXYZObs()/etc. accessors). There used to be
+    // a separate addReflectionsFromData path built against an older,
+    // pre-shaped this.refl.reflData structure that ReflParser no longer
+    // produces -- it had silently bit-rotted (drag-and-drop was disabled on
+    // the only page wired into the build, so nothing exercised it) and has
+    // been removed rather than fixed in place, to avoid two parallel
+    // implementations of the same reflection-parsing logic drifting apart
+    // again.
+    const buffer = await file.arrayBuffer();
+    this.addReflectionsFromJSONMsgpack(arrayBufferToBase64(buffer));
     if (this.hasReflectionTable() && this.isStandalone) {
       this.showCloseReflButton();
     }
-    this.requestRender();
-  }
-
-  addReflectionsFromData(reflData, ignoreIntegratedReflections=false) {
-
-    function getRLP(s1, wavelength, unitS0, viewer, goniometer, angle, U, addAnglesToReflections) {
-
-      const rlp = s1.clone().normalize().sub(unitS0.clone().normalize()).multiplyScalar(1 / wavelength);
-
-      if (!addAnglesToReflections) {
-        return rlp.multiplyScalar(viewer.rLPScaleFactor);
-      }
-      if (angle == null) {
-        console.warn("Rotation angles not in reflection table. Cannot generate rlps correctly if rotation experiment.");
-        return rlp.multiplyScalar(viewer.rLPScaleFactor);
-      }
-      var fixedRotation = goniometer["fixedRotation"];
-      const settingRotation = goniometer["settingRotation"];
-      const rotationAxis = goniometer["rotationAxis"];
-
-      if (window.viewer.crystalFrame && U !== null){
-        fixedRotation = fixedRotation.clone().multiply(U);
-      }
-      rlp.applyMatrix3(settingRotation.clone().invert());
-      rlp.applyAxisAngle(rotationAxis, -angle);
-      rlp.applyMatrix3(fixedRotation.clone().invert().transpose());
-      return rlp.multiplyScalar(viewer.rLPScaleFactor);
-    }
-
-    this.clearReflectionTable();
-    if (!ignoreIntegratedReflections){
-      this.refl.calculatedIntegratedPanelReflData = {};
-      this.integratedReflectionsFromCalculated = false;
-    }
-    if (!this.hasExperiment()) {
-      console.warn("Tried to add reflections but no experiment has been loaded");
-      return;
-    }
-
-    this.refl.panelReflData = reflData;
-    this.refl.reflTable = "reflData";
-
-    const panelKeys = Object.keys(reflData);
-
-    const positionsUnindexed = {};
-    const positionsIndexed = {};
-    const positionsCalculated = {};
-    const positionsIntegrated = {};
-    const crystalPositionsIndexed = {};
-    const crystalPositionsCalculated = {};
-    const crystalPositionsIntegrated = {};
-    this.millerIndicesIndexed = {};
-
-    var scan = this.expt.scan;
-    const addAnglesToReflections = (goniometer !== null && scan !== null);
-
-    for (var i = 0; i < panelKeys.length; i++) {
-
-      const panelIdx = parseInt(panelKeys[i]);
-      var panelReflections = reflData[panelKeys[i]];
-      if (panelReflections === undefined){continue;}
-      const panelData = this.expt.getDetectorPanelDataByIdx(0, panelIdx);
-
-      if (addAnglesToReflections) {
-        panelReflections = this.expt.addAnglesToReflections(panelReflections);
-      }
-
-      const pxSize = [panelData["pxSize"].x, panelData["pxSize"].y];
-      const dMatrix = panelData["dMatrix"];
-
-      for (var j = 0; j < panelReflections.length; j++) {
-
-        const panelReflection = panelReflections[j];
-        const exptID = panelReflection["exptID"];
-        var wavelength = this.expt.getBeamData(exptID)["wavelength"];
-        var wavelengthCal = this.expt.getBeamData(exptID)["wavelength"];
-        var unitS0 = this.expt.getBeamDirection(exptID).multiplyScalar(-1).normalize();
-        var goniometer = this.expt.experiments[exptID].goniometer;
-
-        if ("xyzObs" in panelReflection) {
-          // Reflection contains observed position data
-          const xyzObs = panelReflection["xyzObs"];
-
-          if ("wavelength" in panelReflection) {
-            wavelength = panelReflection["wavelength"];
-          }
-          if (!wavelength) {
-            // Wavelength not found in reflection data or beam data
-            continue;
-          }
-
-          const s1 = this.getS1(xyzObs, dMatrix, wavelength, pxSize);
-          const angle = panelReflection["angleObs"];
-          var U = null;
-          if ("crystalID" in panelReflection && panelReflection["crystalID"] !== "-1"){
-            U = this.expt.getCrystalU(parseInt(panelReflection["crystalID"]))
-          }
-          const rlp = getRLP(s1, wavelength, unitS0, this, goniometer, angle, U, addAnglesToReflections);
-
-          if ("millerIdx" in panelReflection && panelReflection["indexed"]) {
-            // Indexed reflection
-            if (!positionsIndexed[exptID]){
-              positionsIndexed[exptID] = [];
-              this.millerIndicesIndexed[exptID] = [];
-            }
-            positionsIndexed[exptID].push(rlp.x);
-            positionsIndexed[exptID].push(rlp.y);
-            positionsIndexed[exptID].push(rlp.z);
-            this.millerIndicesIndexed[exptID].push(panelReflection["millerIdx"]);
-          }
-          else { 
-            // Unindexed reflection
-            if (!positionsUnindexed[exptID]){
-              positionsUnindexed[exptID] = [];
-            }
-            positionsUnindexed[exptID].push(rlp.x);
-            positionsUnindexed[exptID].push(rlp.y);
-            positionsUnindexed[exptID].push(rlp.z);
-          }
-
-          if ("crystalID" in panelReflection){
-            // Reflection has been assigned to a crystal
-            const crystalID = panelReflection["crystalID"];
-            if (!(crystalID in crystalPositionsIndexed)){
-              crystalPositionsIndexed[crystalID] = [];
-            }
-            crystalPositionsIndexed[crystalID].push(rlp.x);
-            crystalPositionsIndexed[crystalID].push(rlp.y);
-            crystalPositionsIndexed[crystalID].push(rlp.z);
-          }
-        }
-
-        if ("xyzCal" in panelReflection) {
-          // Reflection contains calculated position data
-          const xyzCal = panelReflection["xyzCal"];
-          if ("wavelengthCal" in panelReflection) {
-            wavelengthCal = panelReflection["wavelengthCal"];
-          }
-          if (!wavelengthCal) {
-            continue;
-          }
-          const s1 = this.getS1(xyzCal, dMatrix, wavelengthCal, pxSize);
-          const angle = panelReflection["angleCal"];
-          const rlp = getRLP(s1, wavelengthCal, unitS0, this, goniometer, angle, U, addAnglesToReflections);
-          if (!positionsCalculated[exptID]){
-            positionsCalculated[exptID] = [];
-          }
-          positionsCalculated[exptID].push(rlp.x);
-          positionsCalculated[exptID].push(rlp.y);
-          positionsCalculated[exptID].push(rlp.z);
-
-          if ("crystalID" in panelReflection){
-            // Reflection has been assigned to a crystal
-            const crystalID = panelReflection["crystalID"];
-            if (!(crystalID in crystalPositionsCalculated)){
-              crystalPositionsCalculated[crystalID] = [];
-            }
-            crystalPositionsCalculated[crystalID].push(rlp.x);
-            crystalPositionsCalculated[crystalID].push(rlp.y);
-            crystalPositionsCalculated[crystalID].push(rlp.z);
-          }
-
-          if ("summedIntensity" in panelReflection) {
-            // Reflection has been integrated
-            // If any calculated integration data exists, remove it
-            if (Object.keys(this.refl.calculatedIntegratedPanelReflData).length !== 0 && !ignoreIntegratedReflections){
-              this.refl.calculatedIntegratedPanelReflData = {}
-            }
-            if (!positionsIntegrated[exptID]){
-              positionsIntegrated[exptID] = [];
-            }
-            positionsIntegrated[exptID].push(rlp.x);
-            positionsIntegrated[exptID].push(rlp.y);
-            positionsIntegrated[exptID].push(rlp.z);
-
-            if ("crystalID" in panelReflection){
-              // Reflection has been assigned to a crystal
-              const crystalID = panelReflection["crystalID"];
-              if (!(crystalID in crystalPositionsIntegrated)){
-                crystalPositionsIntegrated[crystalID] = [];
-              }
-              crystalPositionsIntegrated[crystalID].push(rlp.x);
-              crystalPositionsIntegrated[crystalID].push(rlp.y);
-              crystalPositionsIntegrated[crystalID].push(rlp.z);
-            }
-          }
-        }
-      }
-    }
-
-
-    /*
-     * Now create actual sprites
-     * Each ReflectionSet is a set of reflections at a given orientation, 
-     * or for a given crystal. These are then grouped into MeshCollections
-     * based on if they are unindexed, indexed, calculated, integrated
-     */
-
-    const unindexedReflectionSets = {};
-    for (const [exptID, positions] of Object.entries(positionsUnindexed)) {
-      const color = this.colors["reflectionUnindexed"][parseInt(exptID) % this.colors["reflectionUnindexed"].length];
-      const visible = this.unindexedReflectionsCheckbox.checked && this.visibleExptIDs[exptID];
-      const reflectionSet = new ReflectionSet(positions, color, this.reflectionSize.value, this.reflSprite, visible);
-      unindexedReflectionSets[exptID] = reflectionSet;
-    }
-    this.unindexedReflections = new MeshCollection(unindexedReflectionSets);
-
-    const indexedReflectionSets = {};
-    for (const [exptID, positions] of Object.entries(positionsIndexed)) {
-      const color = this.colors["reflectionIndexed"];
-      const visible = this.indexedReflectionsCheckbox.checked && this.visibleExptIDs[exptID];
-      const reflectionSet = new ReflectionSet(positions, color, this.reflectionSize.value, this.reflSprite, visible);
-      indexedReflectionSets[exptID] = reflectionSet;
-    }
-    this.indexedReflections = new MeshCollection(indexedReflectionSets);
-
-    const calculatedReflectionSets = {};
-    for (const [exptID, positions] of Object.entries(positionsCalculated)) {
-      const color = this.colors["reflectionCalculated"];
-      const visible = this.calculatedReflectionsCheckbox.checked && this.visibleExptIDs[exptID];
-      const reflectionSet = new ReflectionSet(positions, color, this.reflectionSize.value, this.reflSprite, visible);
-      calculatedReflectionSets[exptID] = reflectionSet;
-    }
-    this.calculatedReflections = new MeshCollection(calculatedReflectionSets);
-
-    const integratedReflectionSets = {};
-    for (const [exptID, positions] of Object.entries(positionsIntegrated)) {
-      const color = this.colors["reflectionIntegrated"];
-      const visible = this.integratedReflectionsCheckbox.checked && this.visibleExptIDs[exptID];
-      const reflectionSet = new ReflectionSet(positions, color, this.reflectionSize.value, this.reflSprite, visible);
-      integratedReflectionSets[exptID] = reflectionSet;
-    }
-    this.integratedReflections = new MeshCollection(integratedReflectionSets);
-
-    const crystalIndexedReflectionSets = {};
-    for (const [crystalID, positions] of Object.entries(crystalPositionsIndexed)) {
-      let color;
-      if (crystalID === "-1"){
-        color = this.colors["reflectionCrystalUnindexed"];
-      }
-      else{
-        color = this.colors["reflectionCrystalIndexed"][parseInt(crystalID) % this.colors["reflectionCrystalIndexed"].length];
-
-      }
-      const visible = this.unindexedReflectionsCheckbox.checked && this.visibleCrystalIDs[crystalID];
-      const reflectionSet = new ReflectionSet(positions, color, this.reflectionSize.value, this.reflSprite, visible);
-      crystalIndexedReflectionSets[crystalID] = reflectionSet;
-    }
-    this.crystalIndexedReflections = new MeshCollection(crystalIndexedReflectionSets);
-
-    const crystalCalculatedReflectionSets = {};
-    for (const [crystalID, positions] of Object.entries(crystalPositionsCalculated)) {
-      const color = this.colors["reflectionCalculated"];
-      const visible = this.calculatedReflectionsCheckbox.checked && this.visibleCrystalIDs[crystalID];
-      const reflectionSet = new ReflectionSet(positions, color, this.reflectionSize.value, this.reflSprite, visible);
-      crystalCalculatedReflectionSets[crystalID] = reflectionSet;
-    }
-    this.crystalCalculatedReflections = new MeshCollection(crystalCalculatedReflectionSets);
-
-    const crystalIntegratedReflectionSets = {};
-    for (const [crystalID, positions] of Object.entries(crystalPositionsIntegrated)) {
-      const color = this.colors["reflectionIntegrated"];
-      const visible = this.integratedReflectionsCheckbox.checked && this.visibleCrystalIDs[crystalID];
-      const reflectionSet = new ReflectionSet(positions, color, this.reflectionSize.value, this.reflSprite, visible);
-      crystalIntegratedReflectionSets[crystalID] = reflectionSet;
-    }
-    this.crystalIntegratedReflections = new MeshCollection(crystalIntegratedReflectionSets);
-
-    const { dMin, dMax } = getResolutionRange(
-      Object.assign({}, positionsIndexed, positionsUnindexed), this.rLPScaleFactor
-    );
-    const resolutionIndexedSets = {};
-    for (const [exptID, positions] of Object.entries(positionsIndexed)) {
-      const colors = computeResolutionColors(positions, this.rLPScaleFactor, dMin, dMax);
-      const visible = this.indexedReflectionsCheckbox.checked && this.visibleExptIDs[exptID] && this.resolutionView;
-      resolutionIndexedSets[exptID] = new ReflectionSet(positions, null, this.reflectionSize.value, this.reflSprite, visible, this.rLPScaleFactor, colors);
-    }
-    this.resolutionIndexedReflections = new MeshCollection(resolutionIndexedSets);
-
-    const resolutionUnindexedSets = {};
-    for (const [exptID, positions] of Object.entries(positionsUnindexed)) {
-      const colors = computeResolutionColors(positions, this.rLPScaleFactor, dMin, dMax);
-      const visible = this.unindexedReflectionsCheckbox.checked && this.visibleExptIDs[exptID] && this.resolutionView;
-      resolutionUnindexedSets[exptID] = new ReflectionSet(positions, null, this.reflectionSize.value, this.reflSprite, visible, this.rLPScaleFactor, colors);
-    }
-    this.resolutionUnindexedReflections = new MeshCollection(resolutionUnindexedSets);
-
-    const millerIndexLabelSetsData = {};
-    for (const [exptID, positions] of Object.entries(positionsIndexed)) {
-      const indices = this.millerIndicesIndexed[exptID];
-      if (!indices || indices.length === 0) continue;
-      const labelSize = parseInt(this.millerIndexLabelSizeSlider.value);
-      const visible = this.millerIndexLabelsCheckbox.checked &&
-                      this.indexedReflectionsCheckbox.checked &&
-                      
-                      !!this.visibleExptIDs[exptID];
-      millerIndexLabelSetsData[exptID] = new MillerIndexLabelSet(positions, indices, labelSize, visible);
-    }
-    this.millerIndexLabels = new MeshCollection(millerIndexLabelSetsData);
-
-    this.updateReflectionCheckboxStatus();
-    this.setDefaultReflectionsDisplay();
-    this.updateReflectionsVisibility();
-    if (this.resolutionView){
-      this.switchToResolutionView();
-    }
-    else if (this.crystalView){
-      this.switchToCrystalView();
-    }
-    else{
-      this.switchToOrientationView();
-    }
-    this.requestRender();
   }
 
   addReflectionsFromJSONMsgpack(reflMsgpack, ignoreIntegratedReflections=false) {
@@ -2015,9 +1729,6 @@ export class ReciprocalLatticeViewer {
     this.requestRender();
   }
 
-  addReflections() {
-    this.addReflectionsFromData(this.refl.reflData);
-  }
 
   clearMesh() {
     if (this.currentMesh !== null){
@@ -2647,7 +2358,11 @@ export class ReciprocalLatticeViewer {
   }
 
   displayNumberOfReflections() {
-    this.displayHeaderText(this.refl.numReflections + " reflections");
+    // ReflParser has no numReflections property; panel numbers are one
+    // column guaranteed present alongside every reflection.
+    const panelNumbers = this.refl.getPanelNumbers();
+    const count = panelNumbers ? panelNumbers.length : 0;
+    this.displayHeaderText(count + " reflections");
     this.displayingTextFromHTMLEvent = true;
   }
 
