@@ -226,15 +226,33 @@ Things structurally hard on a 2D desktop viewer but natural in a headset:
   it works via the Android file picker on-device, unlike drag-and-drop),
   this block should be removed outright, not left alongside it.
 
+- 2026-09-04: First look with real data on-device: "a lot of surfaces"
+  instead of a point cloud. Root cause was `THREE.PointsMaterial.size` --
+  a raw shader uniform, not a transform, so it doesn't shrink with
+  `VR_WORLD_SCALE` (which works by scaling an ancestor group) the way point
+  *positions* do, and it's only distance-attenuated under a perspective
+  projection (three.js's shader skips that for the desktop
+  OrthographicCamera entirely) — so the existing size, tuned for a camera
+  where it has no distance dependence, blew up into screen-filling quads
+  once real perspective distance attenuation applied at VR's much closer
+  viewing range. Fixed by swapping `material.size` to a separate
+  `VR_POINT_SIZE` constant (0.03, ~3cm) on VR session start and restoring
+  it on exit, mirroring the content-group scale lifecycle. Verified the
+  enter/exit lifecycle directly (dispatching sessionstart/sessionend on
+  renderer.xr — doesn't need real hardware since the handlers only touch
+  the THREE.js scene graph): sizes correctly flip 10 → 0.03 → 10, zero
+  errors. **`VR_POINT_SIZE` itself is still an untested guess** — mechanism
+  is now correct, but whether 3cm is actually the right size wants an
+  on-device look.
+
 ## Needs on-device verification (Quest 3) — not yet checked
 
 - ~~Does "Enter VR" actually appear and start a session at all~~ — confirmed
-  working (empty scene, visible controller laser). Everything below was
-  checked against an *empty* scene; none of it has been tried with the
-  now-auto-loaded reflection data yet.
-- Does the auto-loaded reflection data actually render and look like
-  anything sensible in the headset (the first real test of `VR_WORLD_SCALE`/
-  `VR_CONTENT_DISTANCE` against real geometry, not a guess).
+  working (empty scene, visible controller laser).
+- ~~Does the auto-loaded reflection data render as points, not giant
+  quads~~ — was broken (see above), now fixed pending a re-check on-device.
+- Whether `VR_POINT_SIZE` (0.03) is actually a good point size once seen
+  in the headset, or needs tuning up/down.
 - `VR_WORLD_SCALE` (1/300) and `VR_CONTENT_DISTANCE` (1.2m) defaults — first
   real look at whether the lattice lands at a comfortable size/distance.
 - Controller-ray hover accuracy (hitting individual reflection points with
