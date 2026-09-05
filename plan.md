@@ -253,6 +253,22 @@ Things structurally hard on a 2D desktop viewer but natural in a headset:
   quads~~ — was broken (see above), now fixed pending a re-check on-device.
 - Whether `VR_POINT_SIZE` (0.03) is actually a good point size once seen
   in the headset, or needs tuning up/down.
+- 2026-09-04: reported miller-index hover label "not very consistent."
+  Found the actual bug: `updateVRHover` only ever read `vrControllers[0]`
+  (one arbitrary hand, per whatever order WebXR enumerates input sources —
+  not necessarily consistent or tied to a specific hand), while
+  grab-rotate already checks both controllers. Pointing with the "other"
+  hand, or switching hands, would look exactly like a flaky feature with
+  no way to tell from inside the headset. Fixed to loop over both
+  controllers, same pattern as grab-rotate. **Still needs an on-device
+  recheck** — could only verify the animate loop runs without erroring,
+  not that hover now actually works reliably (headless Chromium has no
+  real XR input sources to test the hit-detection itself against).
+  Also worth watching for: whether the reflection points (now ~3cm) are
+  just inherently fiddly to aim a laser at precisely, separate from the
+  which-hand bug — if hovering still feels unreliable after this fix,
+  that's the next thing to check (may want a larger raycast tolerance
+  specifically for VR).
 - `VR_WORLD_SCALE` (1/300) and `VR_CONTENT_DISTANCE` (1.2m) defaults — first
   real look at whether the lattice lands at a comfortable size/distance.
 - Controller-ray hover accuracy (hitting individual reflection points with
