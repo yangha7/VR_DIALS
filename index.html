@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>VR DIALS Reciprocal Lattice Viewer</title>
+<style>
+	:root {
+		color-scheme: dark;
+	}
+	* { box-sizing: border-box; }
+	html, body {
+		margin: 0;
+		padding: 0;
+		background: #020817;
+		color: #e2e8f0;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	}
+	body {
+		min-height: 100vh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 24px;
+	}
+	main {
+		width: 100%;
+		max-width: 720px;
+	}
+	h1 {
+		font-size: 1.4rem;
+		margin: 0 0 8px 0;
+	}
+	p.subtitle {
+		margin: 0 0 28px 0;
+		color: #94a3b8;
+		font-size: 0.95rem;
+	}
+	.dataset-list {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+	a.dataset-button {
+		display: block;
+		text-decoration: none;
+		color: inherit;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: 12px;
+		padding: 18px 20px;
+		transition: background 0.15s, border-color 0.15s, transform 0.1s;
+	}
+	a.dataset-button:hover, a.dataset-button:focus-visible {
+		background: rgba(88, 166, 255, 0.12);
+		border-color: #58a6ff;
+	}
+	a.dataset-button:active {
+		transform: scale(0.98);
+	}
+	.dataset-name {
+		font-size: 1.1rem;
+		font-weight: 600;
+		margin-bottom: 4px;
+	}
+	.dataset-desc {
+		font-size: 0.9rem;
+		color: #94a3b8;
+		line-height: 1.4;
+	}
+	.dataset-stats {
+		display: inline-block;
+		margin-top: 8px;
+		font-size: 0.78rem;
+		color: #64748b;
+		font-family: ui-monospace, monospace;
+	}
+	footer {
+		margin-top: 28px;
+		font-size: 0.8rem;
+		color: #475569;
+		line-height: 1.5;
+	}
+	footer a {
+		color: #64748b;
+	}
+</style>
+</head>
+<body>
+<main>
+	<h1>VR DIALS Reciprocal Lattice Viewer</h1>
+	<p class="subtitle">Pick a dataset to open directly in the viewer — no typing needed, works with the headset's laser pointer.</p>
+	<div class="dataset-list">
+		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=indexed">
+			<div class="dataset-name">DPF3 — indexed (full)</div>
+			<div class="dataset-desc">All 71,274 reflections from the indexed dataset, unsliced — shows the complete reciprocal-space lattice alignment across all 3 crystals.</div>
+			<div class="dataset-stats">308,394 points · ~83MB · slower to load</div>
+		</a>
+		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=indexed_subset">
+			<div class="dataset-name">DPF3 — indexed (subset)</div>
+			<div class="dataset-desc">Every 7th reflection from the full indexed dataset, spanning all 3 crystals and the full angular range — a faster-loading 1/7th-scale stand-in.</div>
+			<div class="dataset-stats">43,671 points · ~12MB · loads quickly</div>
+		</a>
+		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=strong">
+			<div class="dataset-name">DPF3 — strong spots (pre-indexing)</div>
+			<div class="dataset-desc">dials.find_spots output, before indexing — no Miller indices yet, so everything shows as "unindexed". Renders as the classic Ewald-sphere-shell shape, matching the standard dials.reciprocal_lattice_viewer tutorial.</div>
+			<div class="dataset-stats">213,822 points · ~73MB · slower to load</div>
+		</a>
+		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=none">
+			<div class="dataset-name">Blank scene</div>
+			<div class="dataset-desc">No sample auto-loaded — drag your own .expt/.refl pair onto the viewer instead (desktop only; HTML5 drag-and-drop isn't reliable in the Quest Browser).</div>
+		</a>
+	</div>
+	<footer>
+		Want a live connection to a running DIALS session instead? Open
+		<a href="ReciprocalLatticeViewerHeadless.html?live=1">the viewer with ?live=1</a>
+		to connect to dials_websockets_server_example.py.
+	</footer>
+</main>
+</body>
+</html>
