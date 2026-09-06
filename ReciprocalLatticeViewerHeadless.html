@@ -16,7 +16,7 @@
 		::-webkit-scrollbar-thumb:hover { background: hsl(217.2 32.6% 40%); }
 		::-webkit-scrollbar-corner { background: transparent; }
 	</style>
-  <script type="module" crossorigin src="./assets/main-CvWeUE0X.js"></script>
+  <script type="module" crossorigin src="./assets/main-BK7g81hg.js"></script>
 </head>
 <body>
 	<header id="headerText"> </header>
@@ -59,6 +59,11 @@
 			function updateCrystalFrame(){
 				window.viewer.disableMouseClick();
 				window.viewer.updateCrystalFrame();
+			}
+
+			function updateCrystalColors(){
+				window.viewer.disableMouseClick();
+				window.viewer.updateCrystalColors();
 			}
 
 			function updateEwaldSpheres(){
@@ -130,6 +135,12 @@
 		<b>crystal frame:</b><input type="checkbox"
 		id="crystalFrameCheckbox"
 		onclick="updateCrystalFrame()">
+		</div>
+
+		<div class="checkbox-row" id="crystalColorsRow">
+		<b>crystal colors:</b><input type="checkbox"
+		id="crystalColorsCheckbox"
+		onclick="updateCrystalColors()">
 		</div>
 
 		<div class="checkbox-row" id="reciprocalCellRow">
