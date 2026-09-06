@@ -16,7 +16,7 @@
 		::-webkit-scrollbar-thumb:hover { background: hsl(217.2 32.6% 40%); }
 		::-webkit-scrollbar-corner { background: transparent; }
 	</style>
-  <script type="module" crossorigin src="./assets/main-BfZ-tAZr.js"></script>
+  <script type="module" crossorigin src="./assets/main-CTtB5LSM.js"></script>
 </head>
 <body>
 	<header id="headerText"> </header>
@@ -167,7 +167,7 @@
 		<div id="millerIndexLabelSizeContainer" class="slider-container">
 		<b>label size:</b>  <input type="range" min="5" max="50" value="8"
 		class="slider" id="millerIndexLabelSizeSlider"
-		onmouseup="updateMillerIndexLabelSize()">
+		onmouseup="updateMillerIndexLabelSize()" oninput="updateMillerIndexLabelSize()">
 		</div>
 
 		<div id="unitCellAlignContainer" style="display:none; margin-bottom: 10px;">
@@ -185,9 +185,9 @@
 		</div>
 
 		<div id="reflectionSizeContainer" class="slider-container">
-		<b>reflection size:</b>  <input type="range" min="1" max="25" value="10" 
-		class="slider" id="reflectionSizeSlider" 
-		onmouseup="updateReflectionSize()">
+		<b>reflection size:</b>  <input type="range" min="1" max="25" value="10"
+		class="slider" id="reflectionSizeSlider"
+		onmouseup="updateReflectionSize()" oninput="updateReflectionSize()">
 		</div>
 
 		<div id="meshThresholdContainer" class="slider-container">
