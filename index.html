@@ -91,25 +91,20 @@
 	<h1>VR DIALS Reciprocal Lattice Viewer</h1>
 	<p class="subtitle">Pick a dataset to open directly in the viewer — no typing needed, works with the headset's laser pointer.</p>
 	<div class="dataset-list">
+		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=round1">
+			<div class="dataset-name">12 insulin crystals — round1 (refined)</div>
+			<div class="dataset-desc">12 separate insulin crystals, each collected over only a small ~10° wedge, after joint refinement. Nearly everything indexed — shows 12 differently-oriented crystals' narrow-wedge coverage overlaid in the lab frame.</div>
+			<div class="dataset-stats">404,540 points · ~75MB · slower to load</div>
+		</a>
 		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=indexed">
 			<div class="dataset-name">DPF3 — indexed (full)</div>
 			<div class="dataset-desc">All 71,274 reflections from the indexed dataset, unsliced — shows the complete reciprocal-space lattice alignment across all 3 crystals.</div>
 			<div class="dataset-stats">308,394 points · ~83MB · slower to load</div>
 		</a>
-		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=indexed_subset">
-			<div class="dataset-name">DPF3 — indexed (subset)</div>
-			<div class="dataset-desc">Every 7th reflection from the full indexed dataset, spanning all 3 crystals and the full angular range — a faster-loading 1/7th-scale stand-in.</div>
-			<div class="dataset-stats">43,671 points · ~12MB · loads quickly</div>
-		</a>
 		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=strong">
 			<div class="dataset-name">DPF3 — strong spots (pre-indexing)</div>
 			<div class="dataset-desc">dials.find_spots output, before indexing — no Miller indices yet, so everything shows as "unindexed". Renders as the classic Ewald-sphere-shell shape, matching the standard dials.reciprocal_lattice_viewer tutorial.</div>
 			<div class="dataset-stats">213,822 points · ~73MB · slower to load</div>
-		</a>
-		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=round1">
-			<div class="dataset-name">12 crystals — round1 (refined)</div>
-			<div class="dataset-desc">12 separate insulin crystals, each collected over only a small ~10° wedge, after joint refinement. Nearly everything indexed — shows 12 differently-oriented crystals' narrow-wedge coverage overlaid in the lab frame.</div>
-			<div class="dataset-stats">404,540 points · ~75MB · slower to load</div>
 		</a>
 		<a class="dataset-button" href="ReciprocalLatticeViewerHeadless.html?dataset=none">
 			<div class="dataset-name">Blank scene</div>
